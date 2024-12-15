@@ -309,7 +309,7 @@ class MainActivity : AppCompatActivity() {
                     binding.recyclerView.scrollToPosition(messageList.size - 1)
                 }
             } catch (e: IOException) {
-                throw RuntimeException(e)
+                handleDisconnection("Server", e)
             }
         }
 
@@ -320,7 +320,8 @@ class MainActivity : AppCompatActivity() {
                 inputStream = socket.getInputStream()
                 outputStream = socket.getOutputStream()
             } catch (e: IOException) {
-                throw RuntimeException(e)
+                handleDisconnection("Server", e)
+                return
             }
 
             val executor = Executors.newSingleThreadExecutor()
@@ -340,7 +341,8 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     } catch (e: IOException) {
-                        throw RuntimeException(e)
+                        handleDisconnection("Server", e)
+                        break
                     }
                 }
             }
@@ -357,6 +359,7 @@ class MainActivity : AppCompatActivity() {
         fun write(bytes: ByteArray) {
             try {
                 outputStream.write(bytes)
+                // Update the UI for sent messages
                 runOnUiThread {
                     val sentMessage = Message(String(bytes), isSent = true)
                     messageList.add(sentMessage)
@@ -364,17 +367,18 @@ class MainActivity : AppCompatActivity() {
                     binding.recyclerView.scrollToPosition(messageList.size - 1)
                 }
             } catch (e: IOException) {
-                throw RuntimeException(e)
+                handleDisconnection("Client", e)
             }
         }
 
         override fun run() {
             try {
-                socket.connect(InetSocketAddress(hostAdd, 8888), 500)
+                socket.connect(InetSocketAddress(hostAdd, 8888), 1000)
                 inputStream = socket.getInputStream()
                 outputStream = socket.getOutputStream()
             } catch (e: IOException) {
-                throw RuntimeException(e)
+                handleDisconnection("Client", e)
+                return
             }
 
             val executor = Executors.newSingleThreadExecutor()
@@ -394,10 +398,24 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     } catch (e: IOException) {
-                        throw RuntimeException(e)
+                        handleDisconnection("Client", e)
+                        break
                     }
                 }
             }
+        }
+    }
+    private fun handleDisconnection(role: String, e: IOException) {
+        println("$role disconnected: ${e.message}")
+        runOnUiThread {
+            // Notify the user about the disconnection
+            showToast(this,"$role disconnected: ${e.message}")
+//            startActivity(Intent(this,MainActivity::class.java))
+        }
+        try {
+            socket.close()
+        } catch (closeException: IOException) {
+            println("$role failed to close socket: ${closeException.message}")
         }
     }
 }
